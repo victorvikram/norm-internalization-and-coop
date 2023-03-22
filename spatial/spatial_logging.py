@@ -22,11 +22,12 @@ class Logger:
             self.stats_json = f'data/{directory}/aggr_stats_{trial}.json'
 
         self.datadict = {}
+        self.datadict["demographics"] = {"total": 0, "age": 0, "migrated": 0}
         self.datadict["params"] = param_dict
     
     # Logs stats for each group
     def log_stats(self):
-        strategies = ["civic", "selfish", "static"]
+        strategies = ["civic", "selfish", "static", "coop"]
         year = self.model.year
 
         total_pop_by_strat = {strat: 0 for strat in strategies}
@@ -37,11 +38,6 @@ class Logger:
 
         self.datadict[year] = {}
         self.datadict[year]["g"] = len(self.model.groups)
-
-        if self.model.death_age["count"] == 0:
-            self.datadict[year]["span"] = "NA"
-        else:
-            self.datadict[year]["span"] = self.model.death_age["sum"]/self.model.death_age["count"]
 
         self.datadict[year]["groups"] = {}
         for id, group in self.model.groups.items():
@@ -89,7 +85,6 @@ class Logger:
         for strat in strategies:
             self.datadict[year][strat[:3]] = {}
             self.datadict[year][strat[:3]]["pop"] = total_pop_by_strat[strat]
-            print(strat, self.datadict[year][strat[:3]]["pop"])
             self.datadict[year][strat[:3]]["new"] = total_new_agents_by_strat[strat]
             
             if total_pop_by_strat[strat] > 0:
@@ -97,6 +92,7 @@ class Logger:
                 self.datadict[year][strat[:3]]["fit"] = round(total_fitness_by_strat[strat] / total_pop_by_strat[strat], 2)
                 self.datadict[year][strat[:3]]["coop"] = round(total_coop_by_strat[strat] / total_pop_by_strat[strat], 3)
                 self.datadict[year][strat[:3]]["pi"] = round(total_pi_by_strat[strat] / total_pop_by_strat[strat], 3)
+                print(strat, self.datadict[year][strat[:3]]["pop"], self.datadict[year][strat[:3]]["coop"])
 
         # if only one agent type remains, then we can terminate the model
         if zero_counter == 2 and self.model.p_mutation == 0:

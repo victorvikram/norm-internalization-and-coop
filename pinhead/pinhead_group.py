@@ -58,9 +58,12 @@ class PinheadGroup(Agent):
 
             for indiv in indivs_rewarded:
                 indiv.fitness += self.average_benefit
-        
         else:
             self.average_benefit = 0
+        
+        for indiv in indivs:
+            indiv.avg_fitness = (0.8 * indiv.avg_fitness) + 0.2 * indiv.fitness
+        
 
     """
     PinheadGroup ->
@@ -122,12 +125,20 @@ class PinheadGroup(Agent):
             mutate = np.random.choice([True, False], p=[self.model.p_mutation, 1 - self.model.p_mutation])
             
             if mutate:
-                strategy = np.random.choice([Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT],
-                    p=[self.model.mut_distrib["miscreant"], self.model.mut_distrib["deceiver"], self.model.mut_distrib["citizen"], self.model.mut_distrib["saint"]])
+                strategy = np.random.choice([Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT, Strategy.CIVIC, Strategy.SELFISH, Strategy.STATIC],
+                    p=[self.model.mut_distrib["miscreant"], 
+                        self.model.mut_distrib["deceiver"], 
+                        self.model.mut_distrib["citizen"], 
+                        self.model.mut_distrib["saint"],
+                        self.model.mut_distrib["civic"], 
+                        self.model.mut_distrib["selfish"],
+                        self.model.mut_distrib["static"]])
             else:
                 strategy = reproducing_indiv.strategy
+
+            new_pi = np.random.normal(loc=reproducing_indiv.pi, scale=0.05)
             
-            new_indiv = PinheadAgent("i" + str(self.model.curr_indiv_id), self.model, strategy, self, reproducing_indiv.fitness)
+            new_indiv = PinheadAgent("i" + str(self.model.curr_indiv_id), self.model, strategy, self, reproducing_indiv.fitness, pi=new_pi)
     
     def initialize_strategy_counts(self):
         self.agent_counts = {strat: 0 for strat in Strategy}

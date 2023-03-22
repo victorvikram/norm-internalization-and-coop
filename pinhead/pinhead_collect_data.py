@@ -6,35 +6,35 @@ from datetime import datetime
 import os
 
 center = {
-    "n": 40, 
-    "g": 80,
-    "distrib":{"miscreant": 0.25, "deceiver": 0.25, "citizen": 0.25, "saint": 0.25},
+    "n": 35, 
+    "g": 60,
+    "distrib":{"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 0},
     "benefit": 3.5,
     "cost": 1,
     "fitness": 1,
     "p_mutation": 0.01,
     "p_con": 1/13,
-    "p_mig": 0.03,
+    "p_mig": 0.3,
     "p_survive": 0.7,
     "epsilon": 0.05,
     "threshold": 0.5,
     "saintly_group": False,
-    "years": 50000,
+    "years": 15000,
     "rand": True
 }
 
 # next up, see how low the proliferation goes for 
-distribs = [{"miscreant": 0.49, "deceiver": 0.49, "citizen": 0.00, "saint": 0.02}, {"miscreant": 0.49, "deceiver": 0.49, "citizen": 0.02, "saint": 0.00}, {"miscreant": 0.49, "deceiver": 0.49, "citizen": 0.01, "saint": 0.01}]
-for benefit in [3.25]:
-    for distrib in distribs:
-            for i in range(10):
+distribs = [{"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 0.02, "civic": 0, "selfish": 0.49, "static": 0.49}]
 
-                if distrib["citizen"] == 0:
-                    mut_distrib = {"miscreant": 1/4, "deceiver": 1/4, "citizen": 0, "saint": 1/2}
+for benefit in [3.5]:
+    for mig in [0.6]:
+        for distrib in distribs:
+            for i in range(6):
+
+                if distrib["civic"] == 0:
+                    mut_distrib = {"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 1/3, "civic": 0, "selfish": 1/3, "static": 1/3}
                 elif distrib["saint"] == 0:
-                    mut_distrib = {"miscreant": 1/4, "deceiver": 1/4, "citizen": 1/2, "saint": 0}
-                else:
-                    mut_distrib = {"miscreant": 1/4, "deceiver": 1/4, "citizen": 1/4, "saint": 1/4}
+                    mut_distrib = {"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 0, "civic": 1/3, "selfish": 1/3, "static": 1/3}
                 
                 print(benefit, "\n distrib", distrib, "\n mut", mut_distrib, i)
                 
@@ -48,7 +48,7 @@ for benefit in [3.25]:
                     fitness=center["fitness"],
                     p_mutation=center["p_mutation"],
                     p_con=center["p_con"],
-                    p_mig=center["p_mig"],
+                    p_mig=mig,
                     p_survive=center["p_survive"],
                     epsilon=center["epsilon"],
                     saintly_group=center["saintly_group"],

@@ -91,6 +91,14 @@ class Logger:
         self.big_coop_counter += (total_coop_pct > 0.9)
         self.small_coop_counter += (total_coop_pct < 0.25)
 
+        if self.model.print_stuff:
+            print(self.model.schedule.year)
+            for strat in Strategy:
+                strat_name = strat.name.lower()[:3]
+                if self.datadict[year][strat_name]["pop"] > 0:
+                    print(strat_name, self.datadict[year][strat_name]["pop"] / (self.model.n * self.model.g), self.datadict[year][strat_name]["coop"])
+
+
         # if only one agent type remains, then we can terminate the model
         if self.model.until_high and self.big_coop_counter > 1000:
             self.model.can_terminate = True

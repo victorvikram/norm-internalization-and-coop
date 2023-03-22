@@ -13,7 +13,7 @@ class PinheadModel(Model):
                     self, 
                     n=100, # agents per group 
                     g=20, # number of groups 
-                    distrib={"miscreant": 0.25, "deceiver": 0.25, "citizen": 0.25, "saint": 0.25}, # percentage of each strategy
+                    distrib={"miscreant": 0.25, "deceiver": 0.25, "citizen": 0.25, "saint": 0.25, "civic": 0, "selfish": 0, "static": 0}, # percentage of each strategy
                     mut_distrib=None,
                     benefit=3.5, # benefit of cooperating
                     cost=1, # cost of cooperating 
@@ -31,7 +31,9 @@ class PinheadModel(Model):
                     log_basic=False,
                     log_groups=False,
                     until_high=True,
-                    until_low=False
+                    until_low=False,
+                    learning_rate=0.5,
+                    present_weight=0.2
                 ):
         
         param_dict = {
@@ -62,6 +64,8 @@ class PinheadModel(Model):
         self.benefit = benefit
         self.cost = cost
         self.fitness = fitness
+        self.learning_rate = learning_rate
+        self.present_weight = present_weight
 
         # current id number we're on
         self.curr_group_id = 0
@@ -91,16 +95,20 @@ class PinheadModel(Model):
 
         if self.log_basic:
             if p_con != 1/13:
-                config = f'y{years}_n{n}_g{g}_c{cost}_b{benefit}_pc{p_con}_pm{p_mutation}_ps{p_mig}_r{fitness}_t{threshold}distrib{distrib["citizen"]}_{distrib["saint"]}'
+                config = f'y{years}_n{n}_g{g}_c{cost}_b{benefit}_pc{p_con}_pm{p_mutation}_ps{p_mig}_r{fitness}_t{threshold}_distrib{distrib["civic"]}_{distrib["saint"]}'
             else:
-                config = f'y{years}_n{n}_g{g}_c{cost}_b{benefit}_pm{p_mutation}_ps{p_mig}_r{fitness}_t{threshold}distrib{distrib["citizen"]}_{distrib["saint"]}'
+                config = f'y{years}_n{n}_g{g}_c{cost}_b{benefit}_pm{p_mutation}_ps{p_mig}_r{fitness}_t{threshold}_distrib{distrib["civic"]}_{distrib["saint"]}'
             self.logger = Logger(self, config, param_dict)
 
+        
+        for strategy in ["saint", "citizen", "deceiver", "miscreant", "civic", "static", "selfish"]:
+            if strategy not in distrib:
+                distrib[strategy] = 0
+            if mut_distrib is not None and strategy not in mut_distrib:
+                mut_distrib[strategy] = 0
+
         self.distrib = distrib
-        if mut_distrib is None:
-            self.mut_distrib = distrib
-        else:
-            self.mut_distrib = mut_distrib
+        self.mut_distrib = self.distrib if mut_distrib is None else mut_distrib
 
         self.strategies = self.initialize_strategies(distrib, rand)
         self.initialize_groups(saintly_group)
@@ -143,14 +151,14 @@ class PinheadModel(Model):
     def initialize_strategies(self, distrib, rand):
         if rand:
             strategies = self.random.choices(
-                        population=[Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT],
-                        weights=[distrib["miscreant"], distrib["deceiver"], distrib["citizen"], distrib["saint"]],
+                        population=[Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT, Strategy.CIVIC, Strategy.SELFISH, Strategy.STATIC],
+                        weights=[distrib["miscreant"], distrib["deceiver"], distrib["citizen"], distrib["saint"], distrib["civic"], distrib["selfish"], distrib["static"]],
                         k=self.n*self.g
                         )
         else:
             strategies = []
-            possible_strats = [Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT]
-            weights = [distrib["miscreant"], distrib["deceiver"], distrib["citizen"], distrib["saint"]]
+            possible_strats = [Strategy.MISCREANT, Strategy.DECEIVER, Strategy.CITIZEN, Strategy.SAINT, Strategy.CIVIC, Strategy.SELFISH, Strategy.STATIC]
+            weights = [distrib["miscreant"], distrib["deceiver"], distrib["citizen"], distrib["saint"], distrib["civic"], distrib["selfish"], distrib["static"]]
             for i in range(self.g):
                 for j in range(len(possible_strats)):
                     strategies += [possible_strats[j]] * (round(weights[j]*self.n))
@@ -172,9 +180,6 @@ class PinheadModel(Model):
     def loop(self):
         self.schedule.step()
         self.refresh_agent_total_counts()
-
-        if self.print_stuff and self.schedule.year % 10 == 0:
-            self.print_overall_composition()
 
     """
     EvoModel -> None
@@ -238,6 +243,8 @@ class PinheadModel(Model):
     def replace_group(self, winner, loser):
         loser.kill_group()
         new_group = PinheadGroup("g" + str(self.curr_group_id), self)
+        new_group.num_cooperated = winner.num_cooperated
+        new_group.average_benefit = winner.average_benefit
 
         for indiv in self.group_table[winner]:
             new_indiv = PinheadAgent("i" + str(self.curr_indiv_id), self, indiv.strategy, new_group, indiv.fitness)
@@ -359,21 +366,24 @@ class PinheadModel(Model):
         print("deceivers:", self.agent_counts[Strategy.DECEIVER], ",", self.agent_counts[Strategy.DECEIVER]/(self.n * self.g))
         print("citizens:", self.agent_counts[Strategy.CITIZEN], ",", self.agent_counts[Strategy.CITIZEN]/(self.n * self.g))
         print("saints:", self.agent_counts[Strategy.SAINT], ",", self.agent_counts[Strategy.SAINT]/(self.n * self.g))
+        print("civic:", self.agent_counts[Strategy.CIVIC], ",", self.agent_counts[Strategy.CIVIC]/(self.n * self.g))
+        print("selfish:", self.agent_counts[Strategy.SELFISH], ",", self.agent_counts[Strategy.SELFISH]/(self.n * self.g))
+        print("static:", self.agent_counts[Strategy.STATIC], ",", self.agent_counts[Strategy.STATIC]/(self.n * self.g))
 
 
 
 if __name__ == "__main__":
     pm = PinheadModel(
-            n=40, 
+            n=35, 
             g=80,
             benefit=4,
             cost=1,
             fitness=1,
-            distrib={"miscreant": 0.49, "deceiver": 0.49, "citizen": 0.01, "saint": 0.01},
-            mut_distrib={"miscreant": 1/4, "deceiver": 1/4, "citizen": 1/4, "saint": 1/4},
+            distrib={"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 0.02, "civic": 0, "selfish": 0.49, "static": 0.49},
+            mut_distrib={"miscreant": 0, "deceiver": 0, "citizen": 0, "saint": 1/3, "civic": 0, "selfish": 1/3, "static": 1/3},
             p_mutation=0.01,
             p_con=1/13,
-            p_mig=0.03,
+            p_mig=0.3,
             p_survive=0.7,
             epsilon=0.05,
             threshold=0.5,

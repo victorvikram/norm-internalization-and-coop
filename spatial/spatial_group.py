@@ -117,7 +117,7 @@ class SpatialGroup:
     # also updates the flags
     # **tested**
     def recount_agents(self):
-        self.n_agents = {"static": 0, "selfish": 0, "civic": 0}
+        self.n_agents = {"static": 0, "selfish": 0, "civic": 0, "coop": 0}
         for agent in self.agents:
             self.n_agents[agent.learning] += 1
 

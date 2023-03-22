@@ -14,9 +14,6 @@ class RandomActivationByLevel(RandomActivation):
     Executes the steps of each agent level in turn
     """
     def step(self):
-        if self.model.print_stuff:
-            print("Step:", self.year)
-
         if self.year != 0:
             # reset agent variables
             for indiv in self.model.indiv_table:

@@ -2,3 +2,8 @@
 __pycache__/
 .ipynb_checkpoints/
 .vscode/
+data/
+figures/
+spatial/data
+pinhead/data
+pickle/

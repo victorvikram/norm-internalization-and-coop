@@ -26,13 +26,16 @@ class SpatialModel:
         learning_rate = 0.05, # maximum change of pi every round
         epsilon=0.05, # probability of going against strategy 
         p_swap=0, # probability of migration if an agent is on a square of another group
-        distrib=[1/3, 1/3, 1/3], # probability of each agent type: [static, selfish, civic]
-        mut_distrib=None,
+        distrib=[1/3, 1/3, 1/3, 0], # probability of each agent type: [static, selfish, civic, coop]
+        mut_distrib=None, # probability of mutating into each agent type: [static, selfish, civic, coop] note that mut_distrib has four slots!!
         years=1, # number of rounds
         memory=10, # memory for rolling window of average cooperation level, testing purposes
         rand=True, # turn on and off randomness (for testing purposes)
         write_log=True, # turns on and off logging
-        log_groups=False # logs detailed info about groups
+        p_obs=None, # can set p_obs to a constant value
+        log_groups=False, # logs detailed info about groups
+        mean_lifespan=50,
+        similarity_threshold=1
         ): 
 
         param_dict = {
@@ -53,13 +56,17 @@ class SpatialModel:
             "p_swap": p_swap,
             "rand": rand,
             "distrib": distrib,
-            "years": years   
+            "years": years,
+            "p_obs": p_obs,
+            "mean_lifespan": mean_lifespan,
+            "similarity_threshold": similarity_threshold
         }
 
         # DEMOGRAPHICS AND GEOGRAPHY
         self.n = n
         self.g = g
         self.size = size
+        self.mean_lifespan = mean_lifespan
 
         # COSTS AND BENEFITS
         self.benefit = benefit
@@ -80,6 +87,8 @@ class SpatialModel:
         self.learning_rate = learning_rate
         self.epsilon = epsilon
         self.p_swap = p_swap
+        self.p_obs = p_obs
+        self.similarity_threshold = similarity_threshold
 
         # RANDOMNESS ADJUSTMENT 
         self.rand = rand
@@ -138,7 +147,7 @@ class SpatialModel:
         for i, point in enumerate(group_points):
             # initialize a group and fill it with agents
             group = SpatialGroup(model=self, location=tuple(point), agents=[])
-            agents = [SpatialAgent(model=self, group=group) for j in range(self.n)] 
+            agents = [SpatialAgent(model=self, mean_lifespan=self.mean_lifespan, group=group) for j in range(self.n)] 
             group.set_agents(agents)
 
             # add the group to the model by changing
@@ -205,7 +214,7 @@ class SpatialModel:
     # - cooperation decisions
     # - distribution of goods
     # - agent learning
-    def loop(self, rand=True, rand_square=True, p_obs=None):
+    def loop(self, rand=True, rand_square=True):
 
         # CHANGED 
         # Only do this stuff after the first round, since the initialization occurs
@@ -217,7 +226,7 @@ class SpatialModel:
 
         # make decisions 
         self.square_decisions() # where to forage
-        self.coop_decisions(p_obs=p_obs) # whether to cooperate
+        self.coop_decisions() # whether to cooperate
             
         # aggregates the payoffs for each group, and then distributes them to the agents
         for group in self.groups.values():
@@ -289,7 +298,7 @@ class SpatialModel:
     # SpatialModel -> 
     # calls every agent to decide whether to cooperate
     # **tested**
-    def coop_decisions(self, p_obs=None, rand=True):
+    def coop_decisions(self, rand=True):
         min_pi_sum = 0
         n_agents = 0
         for group in self.groups.values():
@@ -297,7 +306,7 @@ class SpatialModel:
 
             for agent in group.agents:
                 # returns true if agent cooperates
-                cooperator_count += agent.choose_coop(rand=rand, p_obs=p_obs)
+                cooperator_count += agent.choose_coop(rand=rand, p_obs=self.p_obs)
 
                 if self.year != 0:
                     n_here = self.forager_grid.num_foragers(agent.square)
@@ -396,7 +405,7 @@ class SpatialModel:
 
 
 if __name__ == "__main__":
-    cm = SpatialModel(n=20, g=10, size=10, resources=25, cost_coop=20, benefit=70, 
-                cost_distant=5, cost_stayin_alive=2, cost_repro=2, threshold=0.5, p_mutation=0.01, distrib=[1/3, 1/3, 1/3], years=1000, log_groups=True)
+    cm = SpatialModel(n=20, g=10, size=10, resources=20, cost_coop=20, benefit=65, 
+                cost_distant=5, cost_stayin_alive=2, cost_repro=2, threshold=0.5, p_mutation=0.01, p_swap=0.3, distrib=[0.49, 0.49, 0.02, 0], mut_distrib=[1/3, 1/3, 1/3, 0], years=11000, mean_lifespan=20, log_groups=False)
     cm.main()
         

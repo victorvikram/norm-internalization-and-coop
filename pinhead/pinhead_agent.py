@@ -1,6 +1,7 @@
 from mesa import Agent
 
 import random
+import numpy as np
 
 from enum import Enum 
 
@@ -9,14 +10,18 @@ class Strategy(Enum):
     DECEIVER = 2
     CITIZEN = 3
     SAINT = 4
+    CIVIC = 5
+    SELFISH = 6
+    STATIC = 7
 
 
 class PinheadAgent(Agent):
-    def __init__(self, unique_id, model, strategy, group, starting_fitness=0):
+    def __init__(self, unique_id, model, strategy, group, starting_fitness=0, pi=0):
         super().__init__(unique_id, model)
 
         self.strategy = strategy
         self.fitness = starting_fitness
+        self.avg_fitness = starting_fitness
         self.observed = False
         self.cooperates = False
         self.is_new_agent = True
@@ -24,6 +29,8 @@ class PinheadAgent(Agent):
         self.base_fitness = self.model.fitness
         self.erred = False
         self.default_choice = False
+        self.pi = pi
+        self.avg_pi = pi
 
         self.model.curr_indiv_id = int(self.unique_id[1:]) + 1
         self.add_to_group(group)
@@ -51,12 +58,13 @@ class PinheadAgent(Agent):
     asks every agent to cooperate or defect, and decides if the agent gets caught
     **tested**
     """
-    def step(self):
-        self.fitness = self.base_fitness
+    def step(self): 
         p = self.random.uniform(0,1)
-      
         self.p_obs = p
         self.cooperates = self.make_choice()
+
+        # need the fitness from the last round to be preserved for the learning step
+        self.fitness = self.base_fitness
 
         self.observed = self.random.choices([True, False], weights = [p, 1-p])[0]
     
@@ -74,12 +82,9 @@ class PinheadAgent(Agent):
     **tested**
     """
     def deceiver_choice(self, rand=True):
-        if self.is_new_agent:
-            return self.miscreant_choice(rand)
-        else:
-            ev_coop, ev_def = self.calc_evs()
-            p_coop = 1 - self.model.epsilon if ev_coop >= ev_def else self.model.epsilon
-            return self.final_choice(p_coop, rand)
+        ev_coop, ev_def = self.calc_evs()
+        p_coop = 1 - self.model.epsilon if ev_coop >= ev_def else self.model.epsilon
+        return self.final_choice(p_coop, rand)
 
     """
     PinheadAgent -> Float Float
@@ -99,17 +104,48 @@ class PinheadAgent(Agent):
     **tested**
     """
     def citizen_choice(self, rand=True):
-        if self.is_new_agent:
+        group = self.model.indiv_table[self]
+        prop_cooperators = group.num_cooperated/self.model.n # FLAG
+        # changed this because a threshold of 0.3 would be more equivalent to 0.6, since only half of agents are seen
+        if prop_cooperators >= self.model.threshold:
             return self.saint_choice(rand)
         else:
-            group = self.model.indiv_table[self]
-            prop_cooperators = group.num_cooperated/self.model.n # FLAG
-            # changed this because a threshold of 0.3 would be more equivalent to 0.6, since only half of agents are seen
-            if prop_cooperators >= self.model.threshold:
-                return self.saint_choice(rand)
-            else:
-                return self.deceiver_choice(rand)
+            return self.deceiver_choice(rand)
     
+    def learner_choice(self, rand=True):
+
+        if self.strategy == Strategy.CIVIC:
+            self.civic_learn()
+        elif self.strategy == Strategy.SELFISH:
+            self.selfish_learn(rand)
+    
+        
+        group = self.model.indiv_table[self]
+        if self.p_obs * group.average_benefit >= self.model.cost * (1 - self.pi):
+            return self.saint_choice(rand)
+        else:
+            return self.miscreant_choice(rand)
+    
+
+    def selfish_learn(self, rand=True):
+        vec = (self.pi - self.avg_pi)*(self.fitness - self.avg_fitness) / self.fitness 
+        
+        if rand:    
+            vec = np.random.normal(loc=vec, scale=abs(vec)/2)
+
+        self.pi += vec
+        self.avg_pi = (1 - self.model.present_weight) * self.avg_pi + self.model.present_weight * self.pi
+    
+    def civic_learn(self):
+        group = self.model.indiv_table[self]
+        if group.num_cooperated / self.model.n >= self.model.threshold:
+            self.pi = (1 - self.model.learning_rate)*self.pi + self.model.learning_rate # weighted average of pi and 1    
+        else:
+            self.pi = (1 - self.model.learning_rate)*self.pi
+
+        self.avg_pi = (1 - self.model.present_weight) * self.avg_pi + self.model.present_weight * self.pi
+
+
     """
     PinheadAgent -> Boolean
     Feeds 1 - epsilon probability of cooperating to final 
@@ -157,5 +193,7 @@ class PinheadAgent(Agent):
             return self.citizen_choice(rand)
         elif(self.strategy == Strategy.SAINT):
             return self.saint_choice(rand)
+        elif(self.strategy in [Strategy.CIVIC, Strategy.SELFISH, Strategy.STATIC]):
+            return self.learner_choice(rand)
         else:
             return self.new_choice(rand)

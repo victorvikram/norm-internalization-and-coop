@@ -4,11 +4,12 @@ import numpy as np
 class SpatialAgent: 
     next_id = 0
 
-    def __init__(self, model, group, pi=None, learning=None, rand=True):
+    def __init__(self, model, group, mean_lifespan=50, pi=None, learning=None, rand=True):
         # assign identifying id, and superstructures
         self.id = SpatialAgent.next_id
         SpatialAgent.next_id += 1
         self.model = model
+        self.birth_group = group
         self.group = group
 
         # initialize propensity to cooperate
@@ -21,16 +22,19 @@ class SpatialAgent:
         
         # initialize learning style
         if learning is None:
-            self.learning = random.choices(["static", "selfish", "civic"], weights=self.model.distrib)[0] # only happens if this agent is not offspring
+            self.learning = random.choices(["static", "selfish", "civic", "coop"], weights=self.model.distrib)[0] # only happens if this agent is not offspring
         else:
             self.learning = learning
 
+        if self.learning == "coop":
+            self.pi = 1
+
         # variables about life and death
         if rand:
-            self.lifespan = np.random.normal(50, 20)
+            self.lifespan = np.random.normal(mean_lifespan, mean_lifespan/3)
             self.lifespan = self.lifespan if self.lifespan >= 0 else 0 
         else:
-            self.lifespan = 50 
+            self.lifespan = mean_lifespan 
         self.age = 0
         self.first_round = True
 
@@ -60,29 +64,41 @@ class SpatialAgent:
         # 0 - stay, 1 - up, 2 - down, 3 - left, 4 - right
         self.foraging_direction = random.choices(range(5), probs)[0] 
         self.square = self.model.forager_grid.direction_to_coord(self.group.location[0], self.group.location[1], self.foraging_direction) # 
-
-        # decide whether to migrate 
-        migrate = random.choices([True, False], weights = [self.model.p_swap, 1-self.model.p_swap])[0]
+        potential_new_group_index = self.model.grid_group_indices[self.square]
         
-        # if the agent moved, and there is another group on that agent's square, then migrate the agent
-        if migrate and self.foraging_direction != 0 and self.model.grid_group_indices[self.square] != -1:
+        # if the agent moved, and the agent decides to migrate
+        if self.foraging_direction != 0 and self.migration_choice(potential_new_group_index):
             self.just_migrated = True
             self.model.forager_grid_next.add_agent(self.square) # add agent to forager_grid_next as a home agent
-            new_group_num = self.model.grid_group_indices[self.square]
-            self.switch_group(new_group_num) # put agent into the new group
+            self.switch_group(potential_new_group_index) # put agent into the new group
         else:
             self.just_migrated = False
             self.model.forager_grid_next.add_agent(self.square, self.foraging_direction) # add agent to forager_grid as a visiting agent
         
         return self.square
     
+    # if there is a group on the agent's square, and that group fulfills the similarity criterion, then the agent
+    # may migrate with probability p_swap
+    def migration_choice(self, potential_group_index):
+        # there is no group on the square the agent is on
+        if potential_group_index == -1:
+            return False 
+
+        potential_group = self.model.groups[potential_group_index]
+
+        # if the difference in group cooperation levels is allowable
+        if abs(potential_group.avg_pct_cooperators - self.group.avg_pct_cooperators) <= self.model.similarity_threshold:
+            return random.choices([True, False], weights = [self.model.p_swap, 1-self.model.p_swap])[0]
+        else:
+            return False
+        
     # SpatialAgent, Float List -> Boolean 
     # agent decides whether to cooperate
     # returns whether agent cooperates
     # **tested**
     def choose_coop(self, rand=True, p_obs=None):
         # randomly select p_obs
-        self.p_obs = random.uniform(0, 1) if not p_obs else p_obs
+        self.p_obs = random.uniform(0, 1) if p_obs is None else p_obs
 
         # if there are enough resources to pay the full coop cost, pay that, otherwise, pay what's left over
         foraging_cost = self.model.cost_distant if self.foraging_direction != 0 else 0
@@ -96,9 +112,10 @@ class SpatialAgent:
         
         # choose whether to cooperate based on cost
         if self.model.year == 0:
-            self.coop_strategy = (self.model.year == 0 and self.pi > 0.5)
+            self.coop_strategy = False # (self.model.year == 0 and self.pi > 0.5) # POSSIBLY add a condition if p_obs = 0
         else:
             self.coop_strategy = (self.p_obs * self.group.avg_benefit) >= (coop_cost * (1 - self.pi))
+
         if rand:
             self.cooperate = random.choices([self.coop_strategy, not self.coop_strategy], weights=[1 - self.model.epsilon, self.model.epsilon], k=1)[0]
         else:
@@ -130,8 +147,11 @@ class SpatialAgent:
                 elif self.age <= 5:
                     self.model.logger.population_change_stats['early deaths'] += 1
             """
-            self.model.death_age["sum"] += self.age
-            self.model.death_age["count"] += 1 
+            if self.model.write_log:
+                self.model.logger.datadict["demographics"]["total"] += 1
+                self.model.logger.datadict["demographics"]["migrated"] += (self.birth_group != self.group)
+                self.model.logger.datadict["demographics"]["age"] += self.age
+            
             return False
 
     # SpatialAgent, Int -> SpatialAgent
@@ -146,15 +166,17 @@ class SpatialAgent:
             # perturb pi by some little amount
             if rand:
                 learning_style = random.choices([self.learning, None], weights = [1-self.model.p_mutation, self.model.p_mutation])[0]
+                pi = np.random.normal(self.pi, self.model.learning_rate * 0.2) if learning_style != "coop" else 1
+
+                # there was a mutation
                 if learning_style is None:
-                    learning_style = random.choices(["static", "selfish", "civic"], weights=self.model.mut_distrib)[0]
-                
-                pi = np.random.normal(self.pi, self.model.learning_rate)
+                    learning_style = random.choices(["static", "selfish", "civic", "coop"], weights=self.model.mut_distrib)[0]
+
             else:
                 learning_style = self.learning
                 pi = self.pi
             
-            new_agent = SpatialAgent(self.model, self.group, pi=pi, learning=learning_style, rand=rand)
+            new_agent = SpatialAgent(self.model, self.group, pi=pi, mean_lifespan=self.model.mean_lifespan, learning=learning_style, rand=rand)
             
             # not tested
             """
@@ -195,7 +217,7 @@ class SpatialAgent:
             # when avg_pi < pi and avg_fitness_diff < fitness_diff, pi should go up
             
             if self.avg_fitness_diff + self.fitness_diff != 0 :
-                vector = inc * (self.avg_pi - self.pi)*(self.avg_fitness_diff - self.fitness_diff)/(self.avg_fitness_diff + self.fitness_diff)
+                vector = (self.avg_pi - self.pi)*(self.avg_fitness_diff - self.fitness_diff)/ self.avg_fitness_diff # CHANGED
             else:
                 vector = 0
                     
@@ -217,6 +239,14 @@ class SpatialAgent:
                 
             else:
                 self.pi = (1 - inc)*self.pi # weighted average of pi and 0
+        
+        # this is a discrete version of the civic learner
+        # simply switches back and forth from an always-cooperator to an EV-maximizer
+        elif self.learning == "switch":
+            if self.group.pct_cooperators > self.model.threshold:
+                self.pi = 1
+            else:
+                self.pi = 0
         
         # average the old avg pi with the new pi level
         self.avg_pi = self.model.present_weight*self.pi + (1 - self.model.present_weight)*self.avg_pi

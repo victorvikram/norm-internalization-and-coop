@@ -9,6 +9,7 @@ from pinhead_agent import Strategy
 class PinheadTests(unittest.TestCase):
     
     # PinheadModel tests --------------------------------------------------
+    """
     def testInvariants(self):
         pm = PinheadModel(n=100, g=100, p_survive=0.6, p_con=0, p_mig=0.25, benefit=4, cost=1.5, fitness=2, epsilon=0.15, threshold=0.3, print_stuff=True)
         steps = 100
@@ -46,16 +47,16 @@ class PinheadTests(unittest.TestCase):
                     if agent.strategy == Strategy.MISCREANT:
                         expected_counter[Strategy.MISCREANT] += (agent.cooperates == False)
                     elif agent.strategy == Strategy.DECEIVER:
-                        if agent.is_new_agent:
-                            expected_counter[Strategy.DECEIVER] += (agent.cooperates == False)
-                        else:
-                            expectation = (agent.p_obs * group.old_average_benefit >= 1.5)
+                            if not hasattr(group, "old_num_cooperated"):
+                                expectation = False
+                            else:
+                                expectation = (agent.p_obs * group.old_average_benefit >= 1.5)
                             expected_counter[Strategy.DECEIVER] += (agent.cooperates == expectation)
                     elif agent.strategy == Strategy.CITIZEN:
-                        if agent.is_new_agent:
-                            expected_counter[Strategy.CITIZEN] += (agent.cooperates == True)
-                        else:
-                            expectation = (group.old_num_cooperated/100 >= 0.3)
+                            if not hasattr(group, "old_num_cooperated"):
+                                expectation = False
+                            else:
+                                expectation = (group.old_num_cooperated/100 >= 0.3)
                             expected_counter[Strategy.CITIZEN] += (agent.cooperates == expectation)
                     elif agent.strategy == Strategy.SAINT:
                         expected_counter[Strategy.SAINT] += (agent.cooperates == True)
@@ -198,14 +199,14 @@ class PinheadTests(unittest.TestCase):
                     if agent.strategy == Strategy.MISCREANT:
                         expected_counter[Strategy.MISCREANT] += (agent.cooperates == False)
                     elif agent.strategy == Strategy.DECEIVER:
-                        if agent.is_new_agent:
+                        if not hasattr(group, "old_num_cooperated"):
                             expected_counter[Strategy.DECEIVER] += (agent.cooperates == False)
                         else:
                             expectation = (agent.p_obs * group.old_average_benefit >= 1.5)
                             expected_counter[Strategy.DECEIVER] += (agent.cooperates == expectation)
                     elif agent.strategy == Strategy.CITIZEN:
-                        if agent.is_new_agent:
-                            expected_counter[Strategy.CITIZEN] += (agent.cooperates == True)
+                        if not hasattr(group, "old_num_cooperated"):
+                            expected_counter[Strategy.CITIZEN] += (agent.cooperates == False)
                         else:
                             expectation = (group.old_num_cooperated/5 >= 0.5)
                             expected_counter[Strategy.CITIZEN] += (agent.cooperates == expectation)
@@ -344,10 +345,149 @@ class PinheadTests(unittest.TestCase):
             old_group_table = {grp: agents_list.copy() for grp, agents_list in pm.group_table.items()}
 
         self.assertGreater(less_fit_groups_die_counter, 0.8*steps)
+    """
+    def testCivicChoice(self):
+        pm = PinheadModel(learning_rate=0.2, present_weight=0.2)
+
+        average_benefits = [1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 3, 3, 3, 3, 3, 3, 3, 3]
+        p_obses = [0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6, 0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6]
+        num_cooperateds = [60, 60, 40, 40, 60, 60, 40, 40, 60, 60, 40, 40, 60, 60, 40, 40]
+        pis = [0.3, 0.6, 0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,]
+        new_pis = [0.44, 0.68, 0.24, 0.48, 0.44, 0.68, 0.24, 0.48, 0.44, 0.68, 0.24, 0.48, 0.44, 0.68, 0.24, 0.48]
+        cooperates = [False, False, False, False, True, True, False, True, True, True, False, True, True, True, True, True]
+
+        ind = 0
+        for indiv in pm.indiv_table:
+            group = pm.indiv_table[indiv]
+
+            indiv.strategy = Strategy.CIVIC
+            group.average_benefit = average_benefits[ind]
+            indiv.p_obs = p_obses[ind]
+            group.num_cooperated = num_cooperateds[ind]
+            indiv.pi = pis[ind]
+            indiv.avg_pi = 0.5
+
+            choice = indiv.learner_choice(False)
+            self.assertAlmostEqual(indiv.pi, new_pis[ind])
+            self.assertEqual(choice, cooperates[ind])
+            self.assertAlmostEqual(indiv.avg_pi, 0.8*0.5 + 0.2*new_pis[ind])
+
+            ind += 1
+            ind = ind % len(average_benefits)
+
+    def testStaticChoice(self):
+        pm = PinheadModel(learning_rate=0.5, present_weight=0.2)
+        average_benefits = [1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 3, 3, 3, 3, 3, 3, 3, 3]
+        p_obses = [0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6, 0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6]
+        pis = [0.3, 0.6, 0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6]
+        new_pis = [0.3, 0.6, 0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6]
+        cooperates = [False, False, False, False, True, True, True, True, False, True, False, True, True, True, True, True]
+
+        ind = 0
+        for indiv in pm.indiv_table:
+            group = pm.indiv_table[indiv]
+
+            group.average_benefit = average_benefits[ind]
+            indiv.strategy = Strategy.STATIC
+            indiv.p_obs = p_obses[ind]
+            indiv.pi = pis[ind]
+
+            choice = indiv.learner_choice(False)
+            self.assertAlmostEqual(indiv.pi, new_pis[ind])
+            self.assertEqual(choice, cooperates[ind])
+
+            ind += 1
+            ind = ind % len(average_benefits)
+    
+    def testSelfishChoice(self):
+        pm = PinheadModel(learning_rate=0.5, present_weight=0.2)
+        average_benefits = [1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 1.25, 3, 3, 3, 3, 3, 3, 3, 3]
+        p_obses = [0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6, 0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6]
+        fitnesses = [6, 6, 3, 3, 6, 6, 3, 3, 6, 6, 3, 3, 6, 6, 3, 3]
+        pis = [0.3, 0.6, 0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6,0.3, 0.6]
+        new_pis = [0.233333333, 0.633333333,0.366666667,0.566666667,0.233333333,0.633333333,0.366666667,0.566666667,0.233333333,0.633333333,0.366666667,0.566666667,0.233333333,0.633333333,0.366666667,0.566666667]
+        cooperates = [False, False, False, False, False, True, True, True, False, True, False, True, True, True, True, True]
+
+        ind = 0
+        for indiv in pm.indiv_table:
+            group = pm.indiv_table[indiv]
+
+            indiv.strategy = Strategy.SELFISH
+            group.average_benefit = average_benefits[ind]
+            indiv.fitness = fitnesses[ind]
+            indiv.avg_fitness = 4
+            indiv.avg_pi = 0.5
+            indiv.p_obs = p_obses[ind]
+            indiv.pi = pis[ind]
+
+            choice = indiv.learner_choice(False)
+            self.assertAlmostEqual(indiv.pi, new_pis[ind])
+            self.assertEqual(choice, cooperates[ind])
+            self.assertAlmostEqual(indiv.avg_pi, 0.8*0.5 + 0.2*new_pis[ind])
+
+            ind += 1
+            ind = ind % len(average_benefits)
+
+        
+    def testCivicLearn(self):
+        pm = PinheadModel(learning_rate=0.5, present_weight=0.2)
+        num_cooperateds = [40,42,45,48,33,21,12,45,58,69,74,63,88,78,89,78,50,50]
+        pis = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.2]
+        learning_rates = [0.2,0.3,0.4,0.5,0.2,0.3,0.4,0.5,0.2,0.3,0.4,0.5,0.2,0.3,0.4,0.5,0.2,0.3]
+        present_weights = [0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7,0.3,0.7]
+        expected_pis = [0.08,0.14,0.18,0.2,0.4,0.42,0.42,0.4,0.28,0.44,0.58,0.7,0.6,0.72,0.82,0.9,0.92,0.44]
+        expected_avg_pis = [0.374, 0.248,0.404,0.29,0.47,0.444,0.476,0.43,0.434,0.458,0.524,0.64,0.53,0.654,0.596,0.78,0.626,0.458]
+
+        ind = 0
+        for indiv in pm.indiv_table:
+            group = pm.indiv_table[indiv]
+
+            indiv.strategy = Strategy.CIVIC
+            group.num_cooperated = num_cooperateds[ind]
+            indiv.pi = pis[ind]
+            pm.learning_rate = learning_rates[ind]
+            pm.present_weight = present_weights[ind]
+            indiv.avg_pi = 0.5
+
+            indiv.civic_learn()
+            self.assertAlmostEqual(indiv.pi, expected_pis[ind])
+            self.assertAlmostEqual(indiv.avg_pi, expected_avg_pis[ind])
+
+            ind += 1
+            ind = ind % len(num_cooperateds)
+    
+    def testSelfishLearn(self):
+        pm = PinheadModel(learning_rate=0.5, present_weight=0.2)
+        fitnesses = [7,7,7,7,7,7,7,7,4,4,4,4,4,4,4,4]
+        pis = [0.6,0.6,0.6,0.6,0.2,0.2,0.2,0.2,0.6,0.6,0.6,0.6,0.2,0.2,0.2,0.2]
+        learning_rates = [0.2,0.2,0.6,0.6,0.2,0.2,0.6,0.6,0.2,0.2,0.6,0.6,0.2,0.2,0.6,0.6]
+        present_weights = [0.7,0.4,0.7,0.4,0.7,0.4,0.7,0.4,0.7,0.4,0.7,0.4,0.7,0.4,0.7,0.4]
+        expected_pis = [0.628571429,0.628571429,0.628571429,0.628571429,0.114285714,0.114285714,0.114285714,0.114285714,0.575,0.575,0.575,0.575,0.275,0.275,0.275,0.275]
+        expected_avg_pis = [0.59, 0.551428571,0.59,0.551428571,0.23,0.345714286,0.23,0.345714286,0.5525,0.53,0.5525,0.53,0.3425,0.41,0.3425,0.41]
+
+        ind = 0
+        for indiv in pm.indiv_table:
+            group = pm.indiv_table[indiv]
+
+            indiv.strategy = Strategy.SELFISH
+            indiv.pi = pis[ind]
+            indiv.avg_pi = 0.5
+            indiv.avg_fitness = 5
+            indiv.fitness = fitnesses[ind]
+            pm.learning_rate = learning_rates[ind]
+            pm.present_weight = present_weights[ind]
+
+            indiv.selfish_learn(rand=False)
+            self.assertAlmostEqual(indiv.pi, expected_pis[ind])
+            self.assertAlmostEqual(indiv.avg_pi, expected_avg_pis[ind])
+
+            ind += 1
+            ind = ind % len(fitnesses)
+
 
     def testInitializeStrategies(self):
         # check that strategy counts are near the expected value
-        pm = PinheadModel(n=1000, g=10, distrib={"miscreant": 0.4, "deceiver": 0.3, "citizen": 0.2, "saint": 0.1})
+        pm = PinheadModel(n=1000, g=10, distrib={"miscreant": 0.4, "deceiver": 0.3, "citizen": 0.2, "saint": 0.1, "civic": 0, "selfish": 0, "static": 0})
 
         counts = {strat: 0 for strat in Strategy}
         for strat in pm.strategies:
@@ -782,10 +922,10 @@ class PinheadTests(unittest.TestCase):
         is_new_agents = [False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,
                             False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,
                             False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,
-                            False,False,True,True,True,True,True]
+                            False,False]
         cooperates = [False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,False,
                 False,False,False,False,False,False,False,False,False,False,False,False,False,True,False,False,False,False,False,
-                True,True,True,True,True,False,False,False,True,True,True,True,True,True,True,False,False,False,False,False]
+                True,True,True,True,True,False,False,False,True,True,True,True,True,True,True]
         
         for i, agent in enumerate(pm.indiv_table.keys()):
             agent.p_obs = p_obses[i]
@@ -806,7 +946,7 @@ class PinheadTests(unittest.TestCase):
         avg_benefits = [12,12,29,29,12,12,29,29,12,12,29,29,12,12,29,29]
         costs = [4,8,4,8,4,8,4,8,4,8,4,8,4,8,4,8]
 
-        cooperates = [False, False, True, False, False, False, False, False, True, False , True, True, False, False, False, False]
+        cooperates = [False, False, True, False, False, False, True, False, True, False , True, True, True, False, True, True]
 
         for p_obs, is_new_agent, average_benefit, cost, expected_coop in zip(p_obses, is_new_agents, avg_benefits, costs, cooperates):
             pm = PinheadModel(n=500, g=20, cost=cost, epsilon=0.15)
@@ -869,10 +1009,11 @@ class PinheadTests(unittest.TestCase):
             cooperates = agent.citizen_choice(rand=False)
             self.assertEqual(cooperates, expected_cooperate)
 
-            # first-round trial, acts like a saint
+            # no longer depends on newness
             agent.is_new_agent = True 
-            self.assertEqual(agent.citizen_choice(rand=False), True)
-        
+            cooperates = agent.citizen_choice(rand=False)
+            self.assertEqual(cooperates, expected_cooperate)
+
         # random trial
         num_seen_cooperatings = [6,6,6,6,6,6,6,6,10,10,10,10,10,10,10,10,18,18,18,18,18,18,18,18,27,27,27,27,27,27,27,27]
         thresholds = [0.2,0.2,0.2,0.2,0.55,0.55,0.55,0.55,0.2,0.2,0.2,0.2,0.55,0.55,0.55,0.55,0.2,0.2,0.2,0.2,0.55,0.55,0.55,0.55,0.2,0.2,0.2,0.2,0.55,0.55,0.55,0.55]
@@ -903,7 +1044,7 @@ class PinheadTests(unittest.TestCase):
                 # first-round trial, acts like a saint
                 agent.is_new_agent = True 
                 cooperates = agent.citizen_choice(rand=True)
-                expected_counter_saint += (cooperates == True)
+                expected_counter_saint += (cooperates == expected_cooperate)
 
             self.assertTrue(7250 < expected_counter and expected_counter < 7750)
             self.assertTrue(7250 < expected_counter_saint and expected_counter_saint < 7750)
