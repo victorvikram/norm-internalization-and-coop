@@ -1,5 +1,5 @@
-# Conscience and cooperation
-The official repo for [__Polarize, Catalyze, Stabilize: Conscience and the evolution of cooperation__](https://arxiv.org/abs/2112.11664). What we call the "naturalistic model" in the paper is located in `spatial/` and what we call the "abstract model" is located in `pinhead/`.
+# Norm-internalization and cooperation
+The official repo for [__Polarize, Catalyze, Stabilize: How an active minority of norm internalizers amplifies the prosocial effects of group selection and punishment__](https://arxiv.org/abs/2112.11664). What we call the "naturalistic model" in the paper is located in `spatial/` and what we call the "abstract model" is located in `pinhead/`.
 
 The notebook, `data-processing.ipynb` contains all the data analysis that appears in the paper. However, in order to function, it requires data from the model, which is stored [here](https://drive.google.com/drive/folders/191NgPRAGVb0q4hbv9BUPXqfh7lSLAKpv?usp=sharing).
 
