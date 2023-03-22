@@ -5,9 +5,9 @@ The notebook, `data-processing.ipynb` contains all the data analysis that appear
 
 Instructions for transferring folders from the [google drive data folder](https://drive.google.com/drive/folders/191NgPRAGVb0q4hbv9BUPXqfh7lSLAKpv?usp=sharing) to this directory:
 1. Copy the `figures` directory to the root. This is where `data-processing.ipynb` will save the figures.
-2. Copy the `pickle` directory to the root. This contains a pickled dictionary containing pre-processed data from runs of the model, for easy loading.
-3. copy the `pinhead-data` directory to the `pinhead` directory, rename it `data`
-4. copy the `spatial-data` directory to the `spatial` directory, rename it to `data`
+2. Copy the `pickle` directory to the root. This contains a pickled dictionary containing pre-processed data from runs of the model, for easy loading into `data-processing.ipynb`.
+3. Copy the `pinhead-data` directory to the `pinhead` directory; rename it `data` -- this is where the pinhead model will save data, and where  `data-processing.ipynb` will read pinhead model data
+4. copy the `spatial-data` directory to the `spatial` directory, rename it to `data` -- this is where the spatial model will save data, and where  `data-processing.ipynb` will read spatial model data
 
 The bibtex citation for the paper is below.
 
