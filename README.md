@@ -3,7 +3,7 @@ The official repo for [__Polarize, Catalyze, Stabilize: Conscience and the evolu
 
 The notebook, `data-processing.ipynb` contains all the data analysis that appears in the paper. However, in order to function, it requires data from the model, which is stored [here](https://drive.google.com/drive/folders/191NgPRAGVb0q4hbv9BUPXqfh7lSLAKpv?usp=sharing).
 
-Instructions for transferring folders from data folder to this directory:
+Instructions for transferring folders from the [google drive data folder](https://drive.google.com/drive/folders/191NgPRAGVb0q4hbv9BUPXqfh7lSLAKpv?usp=sharing) to this directory:
 1. Copy the `figures` directory to the root. This is where `data-processing.ipynb` will save the figures.
 2. Copy the `pickle` directory to the root. This contains a pickled dictionary containing pre-processed data from runs of the model, for easy loading.
 3. copy the `pinhead-data` directory to the `pinhead` directory, rename it `data`
